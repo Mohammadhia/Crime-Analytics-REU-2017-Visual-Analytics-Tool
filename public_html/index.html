@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<!--
+To change this license header, choose License Headers in Project Properties.
+To change this template file, choose Tools | Templates
+and open the template in the editor.
+-->
+<html lang="en">
+    <head>
+        <title>US Homicide Rates Over Time</title>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <!--<script src="d3/d3.min.js"></script>-->
+        <style type = "text/css">
+            body {
+                padding-top: 75px;
+                padding-left: 150px;
+            }
+            .cities {
+                fill: #3818B9;
+            }
+            
+            #DropDown {
+                position: absolute;
+                bottom: 50%;
+            }
+            
+            .d3-tip {
+                background: white;
+                border: solid 2px black;
+            }
+            
+            .states {
+              fill: skyblue;
+            }
+
+            .state-borders {
+              fill: none;
+              stroke: #fff;
+              stroke-width: 0.5px;
+              stroke-linejoin: round;
+              stroke-linecap: round;
+              pointer-events: none;
+            }
+
+        </style>
+        
+    </head>
+    <body>
+        <svg width="960" height="600"></svg>
+        <select id="DropDown">
+            
+        </select>
+        
+        <script src="https://d3js.org/d3.v4.min.js"></script>
+        <script src="https://d3js.org/topojson.v2.min.js"></script>
+        <script src="d3-tip.js"></script>
+        <script type="text/javascript">
+
+            var svg = d3.select("svg");
+            var path = d3.geoPath();
+            var projection = d3.geoAlbersUsa().scale(1300).translate([960/2,600/2]);
+            
+            var currentYear = 2015; //Initial year. Changes in onChange function
+            var JSONYearData = null;
+            var DropDownList = d3.select("#DropDown");
+            for(var i = 2015; i >= 1985; i--){
+                DropDownList.append('option').text(i);
+            }
+            
+            var tool_tip = d3.tip()
+                    .attr("class", "d3-tip")
+                    .offset([-8,0])
+                    .html(function(d){return "City: " + d.City
+                                                + "<br />" + "Population: " + d["Population"+currentYear]
+                                                + "<br />" + "Months Reported: " + d["Month"+currentYear]
+                                                + "<br />" + "Number of Homicides: " + d["Homicides"+currentYear]
+                                                + "<br />" + "Homicide Rate (per 100,000 people): " + d["Rate"+currentYear];});
+            svg.call(tool_tip);
+            
+            DropDownList.on('change', function(){
+                changeYear(DropDownList.property('value'));
+                console.log(DropDownList.property('value'));
+                currentYear = DropDownList.property('value');
+            });
+            
+            
+            function changeYear(year){
+                JSONYearData.sort(function(a,b){
+                    return b["Rate"+year]-a["Rate"+year];
+                });
+                d3.selectAll("circle").remove();
+                d3.select(".cities")
+                        .selectAll("circle")
+                        .data(JSONYearData)
+                        .enter().append("circle").attr("opacity", 0.7)
+                        .attr("transform",function(d){
+                            console.log(d,d.Longitude,d.Latitude);
+                            return "translate("+projection([d.Longitude, d.Latitude])+")";
+                        })
+                        .attr("r",function(d2){
+                            return d2["Rate"+year]*0.75;
+                        })
+                        .on("mouseover", tool_tip.show)
+                        .on("mouseout", tool_tip.hide);
+//                        .on("mouseover",function(d){
+//                            console.log("Hi world",d);
+//                            d3.select(this).attr("opacity", 1.0);
+//                            cities.style("display", d["Rate"+year]);
+//                            tool_tip.show(d);
+//                        })
+//                        .on("mouseout",function(d){
+//                            d3.select(this).attr("opacity", 0.7);
+//                            tool_tip.hide(d);
+//                        });
+                //d3.selectAll("circle")
+                //    .transition().duration(1000)
+                //    .attr("r", function(d){
+                //        return d["Rate"+year]*0.75;
+                //});                
+            }
+            
+
+            d3.json("https://d3js.org/us-10m.v1.json", function(error, us) {
+                if (error) throw error;
+
+                svg.append("g")
+                    .attr("class", "states")
+                    .selectAll("path")
+                    .data(topojson.feature(us, us.objects.states).features)
+                    .enter().append("path")
+                    .attr("d", path);
+
+                svg.append("path")
+                    .attr("class", "state-borders")
+                    .attr("d", path(topojson.mesh(us, us.objects.states, function(a, b) { return a !== b; })));
+            
+                d3.json("US City Homicide Data (With Geographic Coordinates).json", function(error, data) {
+                    if (error) throw error;
+                    
+                    JSONYearData = data;
+                    data.sort(function(a,b){
+                        return b.Rate2015-a.Rate2015;
+                    });
+                
+                    svg.append("g")
+                        .attr("class", "cities")
+                        .selectAll("cities")
+                        .data(data)
+                        .enter().append("circle").attr("opacity", 0.7)
+                        .attr("transform",function(d){
+                            console.log(d,d.Longitude,d.Latitude);
+                            return "translate("+projection([d.Longitude, d.Latitude])+")";
+                        })
+                        .attr("r",function(d2){
+                            return d2.Rate2015*0.75;
+                        })
+                        .on("mouseover", tool_tip.show)
+                        .on("mouseout", tool_tip.hide);
+//                        .on("mouseover",function(d){
+//                            console.log("Hi world",d);
+//                            d3.select(this).attr("opacity", 1.0);
+//                            cities.style("display", d.Rate2015);
+//                        })
+//                        .on("mouseout",function(d){
+//                            d3.select(this).attr("opacity", 0.7);
+//                        });
+                });
+            });
+        </script>
+    </body>
+</html>
